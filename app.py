@@ -1,5 +1,5 @@
-          with tab1:
-          day_sel = st.date_input("Fecha a analizar", value=date.today(), key="teacher_day")
+     with tab1:
+            day_sel = st.date_input("Fecha a analizar", value=date.today(), key="teacher_day")
 
             # =======================
             # PDF mensual
@@ -204,7 +204,5 @@
                     mime="text/csv",
                 )
             st.markdown("</div>", unsafe_allow_html=True)
-
-
 
 
