@@ -111,6 +111,7 @@ init_db()
 # =========================
 
 def load_moods():
+    st.write(df.columns)
     conn = get_connection()
     df = pd.read_sql("SELECT * FROM moods", conn)
     conn.close()
@@ -235,3 +236,4 @@ with tab3:
     st.divider()
     st.subheader("Lista actual")
     st.dataframe(get_students(), use_container_width=True)
+
