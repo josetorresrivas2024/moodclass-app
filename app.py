@@ -1,239 +1,208 @@
-import streamlit as st
-import sqlite3
-import pandas as pd
-from datetime import datetime
-import plotly.express as px
-from pathlib import Path
+     with tab1:
+            day_sel = st.date_input("Fecha a analizar", value=date.today(), key="teacher_day")
 
-# =========================
-# CONFIGURACIÓN GENERAL
-# =========================
-st.set_page_config(
-    page_title="MoodClass",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+            # =======================
+            # PDF mensual
+            # =======================
+            st.divider()
+            st.markdown("### 📄 Reporte mensual (PDF)")
 
-# =========================
-# ESTILOS RESPONSIVE PRO
-# =========================
-st.markdown("""
-<style>
+            cmy1, cmy2 = st.columns(2)
+            with cmy1:
+                rep_year = st.number_input(
+                    "Año",
+                    min_value=2020,
+                    max_value=2100,
+                    value=date.today().year,
+                    step=1,
+                )
+            with cmy2:
+                rep_month = st.selectbox(
+                    "Mes",
+                    list(range(1, 13)),
+                    index=date.today().month - 1,
+                )
 
-/* Fondo general */
-.main {
-    background-color: #f5f7fa;
-}
+            if st.button("📄 Generar PDF mensual", use_container_width=True):
+                pdf_bytes = generate_monthly_pdf(int(rep_year), int(rep_month))
+                file_name = f"moodclass_reporte_{int(rep_year)}_{int(rep_month):02d}.pdf"
+                st.download_button(
+                    "⬇️ Descargar PDF",
+                    data=pdf_bytes,
+                    file_name=file_name,
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
-/* Cards modernas */
-.mcard {
-    background: white;
-    padding: 1.2rem;
-    border-radius: 14px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
-    margin-bottom: 1rem;
-}
+            st.divider()
 
-/* Título de card */
-.mcard-title {
-    font-weight: 700;
-    font-size: 1.1rem;
-    margin-bottom: 0.8rem;
-    color: #1f2937;
-}
+            df = load_moods(day=str(day_sel))
+            df_entrada = df[df["moment"] == "entrada"].copy()
+            df_salida = df[df["moment"] == "salida"].copy()
 
-/* KPIs */
-.kpi-box {
-    background: linear-gradient(135deg,#4f46e5,#6366f1);
-    color: white;
-    padding: 1rem;
-    border-radius: 12px;
-    text-align: center;
-    font-weight: 600;
-}
+            # =======================
+            # KPIs + semáforo
+            # =======================
+            total_registros = len(df)
+            total_entrada = len(df_entrada)
 
-/* Responsive móvil */
-@media (max-width: 768px) {
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    .mcard {
-        padding: 0.8rem;
-    }
-}
+            if not df_entrada.empty:
+                labels = df_entrada["emotion"].apply(emotion_label)
+                emocion_top = labels.value_counts().idxmax()
+            else:
+                emocion_top = "—"
 
-</style>
-""", unsafe_allow_html=True)
+            status, pct = traffic_light(df_entrada)
+            if status.startswith("🟢"):
+                badge_class = "badge badge-green"
+            elif status.startswith("🟡"):
+                badge_class = "badge badge-yellow"
+            else:
+                badge_class = "badge badge-red"
 
-# =========================
-# BASE DE DATOS
-# =========================
-DB_PATH = "moodclass.db"
+            st.markdown("### 📊 Resumen del día")
 
-def get_connection():
-    return sqlite3.connect(DB_PATH)
+            k1, k2, k3, k4 = st.columns(4)
+            with k1:
+                st.markdown(
+                    f"<div class='kpi'><div class='kpi-title'>Registros hoy</div>"
+                    f"<div class='kpi-value'>{total_registros}</div>"
+                    f"<div class='kpi-sub'>Entrada + salida</div></div>",
+                    unsafe_allow_html=True,
+                )
+            with k2:
+                st.markdown(
+                    f"<div class='kpi'><div class='kpi-title'>Entradas registradas</div>"
+                    f"<div class='kpi-value'>{total_entrada}</div>"
+                    f"<div class='kpi-sub'>inicio de jornada</div></div>",
+                    unsafe_allow_html=True,
+                )
+            with k3:
+                st.markdown(
+                    f"<div class='kpi'><div class='kpi-title'>Emoción más frecuente</div>"
+                    f"<div class='kpi-value'>{emocion_top}</div>"
+                    f"<div class='kpi-sub'>al ingresar</div></div>",
+                    unsafe_allow_html=True,
+                )
+            with k4:
+                st.markdown(
+                    f"<div class='kpi'><div class='kpi-title'>Estados cargados</div>"
+                    f"<div class='kpi-value'>{pct:.1f}%</div>"
+                    f"<div class='kpi-sub'>Molesto/Triste/Ansioso/Preocupado/Cansado</div></div>",
+                    unsafe_allow_html=True,
+                )
 
-def init_db():
-    conn = get_connection()
-    c = conn.cursor()
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
-        )
-    """)
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS moods (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_name TEXT,
-            emotion TEXT,
-            reason TEXT,
-            note TEXT,
-            moment TEXT,
-            is_anonymous INTEGER,
-            created_at TEXT,
-            day TEXT
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# =========================
-# FUNCIONES
-# =========================
-
-def load_moods():
-    st.write(df.columns)
-    conn = get_connection()
-    df = pd.read_sql("SELECT * FROM moods", conn)
-    conn.close()
-    return df
-
-def get_students():
-    conn = get_connection()
-    df = pd.read_sql("SELECT * FROM students", conn)
-    conn.close()
-    return df
-
-def add_student(name):
-    conn = get_connection()
-    conn.execute("INSERT INTO students (name) VALUES (?)", (name,))
-    conn.commit()
-    conn.close()
-
-def emotion_label(e):
-    mapping = {
-        "happy": "Feliz",
-        "sad": "Triste",
-        "angry": "Molesto",
-        "anxious": "Ansioso",
-        "calm": "Calmado"
-    }
-    return mapping.get(e, e)
-
-# =========================
-# INTERFAZ
-# =========================
-
-st.title("🎓 MoodClass - Panel Docente")
-
-tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "👤 Vista individual", "⚙️ Gestión"])
-
-# =========================
-# TAB 1 - DASHBOARD
-# =========================
-with tab1:
-
-    df = load_moods()
-
-    if df.empty:
-        st.info("Aún no hay registros.")
-    else:
-        day_sel = st.date_input("Selecciona fecha", datetime.now())
-        day_sel = str(day_sel)
-
-        df_day = df[df["day"] == day_sel]
-
-        if df_day.empty:
-            st.warning("No hay registros en esta fecha.")
-        else:
-            st.markdown("<div class='mcard'>", unsafe_allow_html=True)
-            st.markdown("<div class='mcard-title'>Resumen del día</div>", unsafe_allow_html=True)
-
-            total = len(df_day)
-            positivos = len(df_day[df_day["emotion"] == "happy"])
-            negativos = len(df_day[df_day["emotion"].isin(["sad","angry","anxious"])])
-
-            col1, col2 = st.columns(2)
-            col3, col4 = st.columns(2)
-
-            col1.markdown(f"<div class='kpi-box'>Total<br>{total}</div>", unsafe_allow_html=True)
-            col2.markdown(f"<div class='kpi-box'>Positivos<br>{positivos}</div>", unsafe_allow_html=True)
-            col3.markdown(f"<div class='kpi-box'>Negativos<br>{negativos}</div>", unsafe_allow_html=True)
-            col4.markdown(f"<div class='kpi-box'>Balance<br>{positivos - negativos}</div>", unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            # Gráfico
-            st.markdown("<div class='mcard'>", unsafe_allow_html=True)
-            st.markdown("<div class='mcard-title'>Distribución emocional</div>", unsafe_allow_html=True)
-
-            vc = df_day["emotion"].value_counts().reset_index()
-            vc.columns = ["emotion", "count"]
-
-            fig = px.pie(vc, names="emotion", values="count")
-            st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-# =========================
-# TAB 2 - INDIVIDUAL
-# =========================
-with tab2:
-
-    students_df = get_students()
-
-    if students_df.empty:
-        st.info("No hay estudiantes registrados.")
-    else:
-        student = st.selectbox("Selecciona estudiante", students_df["name"])
-
-        df = load_moods()
-        df_student = df[df["student_name"] == student]
-
-        if df_student.empty:
-            st.warning("Sin registros.")
-        else:
-            st.dataframe(
-                df_student[["created_at","emotion","reason","note"]],
-                use_container_width=True
+            st.markdown(
+                f"<div class='{badge_class}'>🚦 {status} · {pct:.1f}% cargado</div>",
+                unsafe_allow_html=True,
             )
 
-# =========================
-# TAB 3 - GESTIÓN
-# =========================
-with tab3:
+            # =======================
+            # Top 3 + comparación
+            # =======================
+            st.divider()
 
-    st.subheader("Agregar estudiante")
-    new_name = st.text_input("Nombre completo")
+            a, b = st.columns(2)
+            with a:
+                st.markdown(
+                    "<div class='mcard'><div class='mcard-title'>🏁 Top 3 al entrar</div>",
+                    unsafe_allow_html=True,
+                )
+                st.dataframe(top3_table(df_entrada), use_container_width=True, hide_index=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.button("Agregar"):
-        if new_name.strip():
-            add_student(new_name.strip())
-            st.success("Estudiante agregado")
-            st.rerun()
-        else:
-            st.error("Escribe un nombre válido")
+            with b:
+                st.markdown(
+                    "<div class='mcard'><div class='mcard-title'>🏁 Top 3 al salir</div>",
+                    unsafe_allow_html=True,
+                )
+                st.dataframe(top3_table(df_salida), use_container_width=True, hide_index=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-    st.divider()
-    st.subheader("Lista actual")
-    st.dataframe(get_students(), use_container_width=True)
+            comp = compare_entrada_salida(df_entrada, df_salida)
+            st.markdown(
+                "<div class='mcard'><div class='mcard-title'>🔁 Comparación Entrada vs Salida</div>",
+                unsafe_allow_html=True,
+            )
+            if comp.empty:
+                st.info("Sin datos suficientes para comparar.")
+            else:
+                st.dataframe(comp, use_container_width=True, hide_index=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # =======================
+            # Gráficos
+            # =======================
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.markdown(
+                    "<div class='mcard'><div class='mcard-title'>📊 Emociones al entrar</div>",
+                    unsafe_allow_html=True,
+                )
+                if df_entrada.empty:
+                    st.info("Sin registros de entrada.")
+                else:
+                    vc = df_entrada["emotion"].value_counts().reset_index()
+                    vc.columns = ["emotion", "count"]
+                    fig = px.bar(vc, x="emotion", y="count")
+                    st.plotly_chart(fig, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with c2:
+                st.markdown(
+                    "<div class='mcard'><div class='mcard-title'>🟠 Emociones al salir</div>",
+                    unsafe_allow_html=True,
+                )
+                if df_salida.empty:
+                    st.info("Sin registros de salida.")
+                else:
+                    vc = df_salida["emotion"].value_counts().reset_index()
+                    vc.columns = ["emotion", "count"]
+                    fig = px.pie(vc, names="emotion", values="count")
+                    st.plotly_chart(fig, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # =======================
+            # Botiquín
+            # =======================
+            st.divider()
+            st.markdown(
+                "<div class='mcard'><div class='mcard-title'>🧰 Botiquín emocional sugerido</div>",
+                unsafe_allow_html=True,
+            )
+            msg, tools = recommended_tool(df_entrada)
+            st.write(msg)
+            for t in tools:
+                st.write("• " + t)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            # =======================
+            # Detalle + CSV
+            # =======================
+            st.divider()
+            st.markdown(
+                "<div class='mcard'><div class='mcard-title'>🧾 Registros del día (detalle)</div>",
+                unsafe_allow_html=True,
+            )
+            if df.empty:
+                st.info("Sin datos en esta fecha.")
+            else:
+                show = df.copy()
+                show["estudiante"] = show.apply(
+                    lambda r: "Anónimo" if r["is_anonymous"] == 1 else (r["student_name"] or "—"),
+                    axis=1,
+                )
+                show = show[["created_at", "moment", "estudiante", "emotion", "reason", "note"]]
+                st.dataframe(show, use_container_width=True, hide_index=True)
+
+                csv = show.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    "⬇️ Descargar CSV (piloto)",
+                    data=csv,
+                    file_name=f"moodclass_{day_sel}.csv",
+                    mime="text/csv",
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+
 
