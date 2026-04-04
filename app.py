@@ -142,11 +142,32 @@ def generate_monthly_pdf(year, month):
 st.set_page_config(page_title=APP_TITLE, page_icon="🎒", layout="centered")
 
 # Inyectar tu CSS original
+# Inyectar CSS mejorado para visibilidad total
 st.markdown("""
 <style>
-    [data-testid="stAppViewContainer"] { background: #F7F9FC !important; }
-    .mcard { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; border: 1px solid #eee; }
-    .stButton>button { border-radius: 12px !important; font-weight: bold !important; }
+    /* Forzar fondo general */
+    .stApp {
+        background-color: #F7F9FC !important;
+    }
+    /* Forzar color de texto en toda la app para que no se pierda */
+    h1, h2, h3, p, span, label {
+        color: #1E1E1E !important;
+    }
+    /* Estilo de las tarjetas (mcard) */
+    .mcard {
+        background: white !important;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+    }
+    /* Ajuste para los inputs y botones */
+    .stButton>button {
+        border-radius: 12px !important;
+        background-color: #4A90E2 !important;
+        color: white !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
