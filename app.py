@@ -8,7 +8,7 @@ import plotly.express as px
 st.set_page_config(page_title="MoodClass", page_icon="🎒", layout="centered")
 
 # --- CONEXIÓN SEGURA ---
-# Intentamos usar Secrets (Recomendado), si falla usamos la URL directa
+# Se prioriza el uso de Secrets para mayor seguridad
 try:
     if "MONGO_URI" in st.secrets:
         uri = st.secrets["MONGO_URI"]
@@ -25,10 +25,8 @@ def get_database():
 db = get_database()
 col_moods = db['moods']
 
-# --- DISEÑO ---
-st.markdown("<style>.stApp { background-color: #0E1117 !important; color: white !important; }</style>", unsafe_allow_html=True)
+# --- INTERFAZ ---
 st.title("🎒 MoodClass")
-
 tab1, tab2 = st.tabs(["👦 Estudiante", "🧑‍🏫 Docente"])
 
 with tab1:
@@ -47,21 +45,12 @@ with tab1:
 with tab2:
     pin = st.text_input("PIN Docente", type="password")
     if pin == "1234":
-        cursor = col_moods.find({"day": str(date.today())})
-        datos = list(cursor)
+        datos = list(col_moods.find({"day": str(date.today())}))
         if datos:
             df = pd.DataFrame(datos)
             conteo = df['emotion'].value_counts().reset_index()
             conteo.columns = ['emocion', 'count']
-            
-            fig = px.bar(
-                conteo, 
-                x="emocion", 
-                y="count", 
-                color="emocion",
-                labels={'emocion': 'Estado de Ánimo', 'count': 'Cantidad'},
-                template="plotly_dark"
-            )
+            fig = px.bar(conteo, x="emocion", y="count", color="emocion", template="plotly_dark")
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No hay registros hoy.")
