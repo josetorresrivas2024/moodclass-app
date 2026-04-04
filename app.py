@@ -133,12 +133,11 @@ with t2:
             
             # 3. Creamos el gráfico usando los nuevos nombres
             fig = px.bar(
-                conteo, 
-                x="Sentimiento", 
-                y="Cantidad", 
+                resumen, 
+                x="Sentimiento",  # <--- Ahora usamos el nombre nuevo
+                y="Cantidad",     # <--- Y este también
                 color="Sentimiento",
-                template="plotly_dark",
-                title="Resumen Emocional"
+                template="plotly_dark"
             )
             st.plotly_chart(fig, use_container_width=True)
             st.table(datos[["moment", "Alumno", "emotion"]])
