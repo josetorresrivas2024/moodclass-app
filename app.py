@@ -3,7 +3,18 @@ from pymongo import MongoClient
 from datetime import datetime, date
 import pandas as pd
 import plotly.express as px
-from bson.objectid import ObjectId
+
+# --- CONEXIÓN SEGURA USANDO SECRETS ---
+# Aquí Streamlit busca automáticamente la clave que guardaste en el paso anterior
+MONGO_URI = st.secrets["MONGO_URI"]
+
+@st.cache_resource
+def get_database():
+    client = MongoClient(MONGO_URI)
+    return client['moodclass_db']
+
+db = get_database()
+col_moods = db['moods']
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 MONGO_URI = "mongodb+srv://joseycarito75_db_user:5jfbQjoh5B84RE4R@cluster0.hzl7cg0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
