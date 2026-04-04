@@ -27,3 +27,4 @@ File "/opt/render/project/src/.venv/lib/python3.14/site-packages/plotly/express/
     ^
 File "/opt/render/project/src/.venv/lib/python3.14/site-packages/plotly/express/_core.py", line 1358, in process_args_into_dataframe
     raise ValueError(err_msg)
+# Actualización forzada
