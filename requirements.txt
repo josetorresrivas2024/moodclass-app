@@ -2,5 +2,3 @@ streamlit
 pymongo[srv]
 pandas
 plotly
-matplotlib
-reportlab
